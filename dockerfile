@@ -1,20 +1,29 @@
-# Use AWS Lambda base image for Node.js 18
-FROM public.ecr.aws/lambda/nodejs:18
+FROM node:16.16.0-alpine3.16
 
-# Set working directory inside the container
-WORKDIR /var/task
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH=$PATH:/home/node/.npm-global/bin
 
-# Copy package files
-COPY package.json package-lock.json ./
+RUN npm -g config set registry http://registry.npmjs.org/
+RUN npm -g config set strict-ssl false
 
-# Install dependencies (production only)
-RUN npm install --production
+WORKDIR src/app
+COPY package*.json ./
 
-# Copy the rest of the application code
-COPY . .
+USER root
+RUN apk add libreoffice
+RUN apk add libreoffice-writer
+RUN apk add libreoffice-calc
+RUN apk add libreoffice-impress
+RUN apk add fontconfig
 
-# Build the Next.js project
-RUN npm run build
+RUN mkdir -p /usr/share/fonts
+COPY src/app/fonts/* /usr/share/fonts/
+RUN fc-cache -f -v
 
-# Define the Lambda function handler file
-CMD ["server.handler"]
+RUN npm install
+
+COPY --chown=node:node . .
+
+EXPOSE 8080
+
+CMD [ "node", "index.js" ]

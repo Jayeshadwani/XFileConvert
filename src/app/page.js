@@ -37,8 +37,8 @@ export default function Home() {
         continue;
       }
 
-      if (fileType !== requiredFormat) {
-        alert(`File ${file.name} is not in ${requiredFormat} format`);
+      if (fileType !== actualFormat) {
+        alert(`File ${file.name} is not in ${actualFormat} format`);
         continue;
       }
 
@@ -74,6 +74,81 @@ export default function Home() {
 
   const handleActiveStepChange = (step) => {
     setActiveStep(step);
+  };
+
+  const base64ToBlob = (base64, contentType = "", sliceSize = 512) => {
+    try {
+      const byteCharacters = atob(base64);
+      const byteArrays = [];
+
+      for (
+        let offset = 0;
+        offset < byteCharacters.length;
+        offset += sliceSize
+      ) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+      }
+
+      return new Blob(byteArrays, { type: contentType });
+    } catch (error) {}
+  };
+
+  const getBase64String = (contentBase64, contentType) => {
+    return `data:${contentType};base64,${contentBase64}`;
+  };
+
+  const downloadFile = (Filename, ContentBase64, ContentType) => {
+    const link = document.createElement("a");
+    link.href = getBase64String(ContentBase64, ContentType);
+    link.download = Filename;
+    document.body.appendChild(link);
+    link.click();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      // Convert file to Base64
+      // const base64File = await convertFileToBase64(file);
+
+      // Create the payload
+      const payload = {
+        files: files,
+        conversionType: requiredFormat,
+      };
+
+      // Send Base64 file and conversion type to the backend
+      await fetch("/api/convert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          const { pdfBuffer } = data;
+          console.log(Buffer.from(pdfBuffer).toString("base64"));
+          // const pdfContent = getBase64String(pdfBase64,'application/pdf')
+          // const fileName = 'kuchbhi.pdf'
+          // const contentType = 'application/pdf'
+          // console.log('.then  pdfContent', pdfContent);
+
+          // downloadFile(fileName, pdfContent, contentType);
+        })
+        .catch(console.error);
+    } catch (error) {
+      console.error("Error during file conversion:", error);
+    }
   };
 
   return (
@@ -162,26 +237,25 @@ export default function Home() {
             {/* File Upload Section */}
             <div
               className="uploadFileSectionWrapper"
-              onClick={handleButtonClick}>
-              <div
-                className="uploadFileSection"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-                  const droppedFiles = Array.from(e.dataTransfer.files);
-                  handleChangeInput({ target: { files: droppedFiles } });
-                }}>
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                handleChangeInput({ target: { files: droppedFiles } });
+              }}
+              onClick={handleButtonClick}>
+              <div className="uploadFileSection">
                 {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
                   className="uploadFileInput"
                   type="file"
-                  accept={`.${requiredFormat}`}
+                  accept={`.${actualFormat}`}
                   multiple
                   onChange={(event) => handleChangeInput(event)}
                   style={{ display: "none" }}
@@ -221,7 +295,9 @@ export default function Home() {
                 }}>
                 Go Back
               </button>
-              <button className="uploadFilesButton">Convert</button>
+              <button className="uploadFilesButton" onClick={handleSubmit}>
+                Convert
+              </button>
             </section>
           </>
         ) : null}
